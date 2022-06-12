@@ -9,3 +9,4 @@ geopandas
 selenium
 networkx
 pyvis
+webdriver_manager
