@@ -6,3 +6,6 @@ folium
 streamlit_folium
 geopy
 geopandas
+selenium
+networkx
+pyvis
