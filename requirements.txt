@@ -1,0 +1,8 @@
+altair
+plotly
+plotly_express
+seaborn
+folium
+streamlit_folium
+geopy
+geopandas
