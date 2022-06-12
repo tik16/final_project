@@ -145,13 +145,6 @@ with st.echo(code_location='below'):
         st.write(oscar_data.tail(20))
         st.write(best_picture_data.head(20))
 
-    winner_pictures = best_picture_data.loc[best_picture_data["Award"] == "Winner", :]
-    winners_without_nan = winner_pictures.loc[winner_pictures["Content Rating"].isna() == False]
-
-    fig,ax = plt.subplots(figsize = (8,8))
-    ax.hist(winners_without_nan["Content Rating"])
-    st.pyplot(fig)
-
     """
         # Работа с сайтом IMDB
     """
@@ -203,17 +196,8 @@ with st.echo(code_location='below'):
     st.write("Фильмы с оскаром: ", cnt_wins)
 
     st.write("С кем этот актер снимался за свою актеру?")
-    st.write("Будем использовать только данные из ")
 
-    st.write(movie_metadata.head(20))
     actor_links = pd.DataFrame(columns=["from", "to"])
-    '''for ind,row in movie_metadata.iterrows():
-        actor1 = row["actor_1_name"]
-        actor2 = row["actor_2_name"]
-        actor3 = row["actor_3_name"]
-        #st.write(pd.DataFrame.from_dict({"from": actor1, "to": actor2}))
-        actor_links = pd.concat([actor_links, pd.DataFrame({"from": [actor1], "to": [actor2]})])
-        actor_links = pd.concat([actor_links, pd.DataFrame({"from": [actor1], "to": [actor3]})])'''
 
     for ind, movie in best_picture_data.dropna().iterrows():
         actors = [x.strip() for x in movie["Actors"].split(",")]
@@ -221,8 +205,6 @@ with st.echo(code_location='below'):
             for other_actor in actors:
                 if(picked_actor.strip()!=other_actor):
                     actor_links = pd.concat([actor_links, pd.DataFrame({"from": [picked_actor.strip()], "to": [other_actor]})])
-
-    st.write(actor_links)
 
     wikigraph = nx.DiGraph([(frm, to) for (frm, to) in actor_links.values])
     subgraph = wikigraph.subgraph(
