@@ -22,6 +22,10 @@ import networkx as nx
 from pyvis import network as net
 from IPython.core.display import display, HTML
 import streamlit.components.v1 as components
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, plot_roc_curve, roc_auc_score
+import re
 
 with st.echo(code_location='below'):
 
@@ -130,6 +134,26 @@ with st.echo(code_location='below'):
 
     oscar_data, best_picture_data, movie_metadata = get_data()
 
+    '''
+        # Финальный проект
+    '''
+
+    '''
+        Использованные технологии:
+        * обработка данных с помощью pandas
+        * веб-скреппинг(Selenium)
+        * работа с недокументированным API
+        * визуализация(локации, актеры, простая гистограмма)
+        * numpy(нормирование данных, преобразование колонок таблиц)
+        * streamlit
+        * регулярные выражения
+        * геоданные(folium, geopy, pyvis)
+        * машинное обучение
+        * networkx
+        * доп технологии: geopy и pyvis - преобразование адреса локации фильма в широту и долготу 
+        * больше 120 строк)
+    '''
+
     show_data = st.expander("Посмотреть данные")
 
     with show_data:
@@ -141,67 +165,9 @@ with st.echo(code_location='below'):
         # Работа с сайтом IMDB
     """
 
-    '''
-        ## Можно выбрать обработанные фильмы из предложенного списка
-    '''
-
-    movies_prepared = ["The ShawShank Redemption", "The Godfather", "The Dark Knight"]
-    actors_prepared = ["TheShawShankRedemptionActors.txt","TheGodfatherActors.txt","TheDarkKnightActors.txt"]
-    loc_prepared = ["TheShawShankRedemptionLoc.txt", "TheGodfatherLoc.txt", "TheDarkKnightLoc.txt"]
-    coor_prepared = ["TheShawShankRedemptionCoor.txt","TheGodfatherCoor.txt", "TheDarkKnightCoor.txt"]
-
-    picked_movie = st.selectbox("Выбрать фильм из списка для демонстрации", movies_prepared)
-    pos = movies_prepared.index(picked_movie)
-    actors_names = get_prepared_data(actors_prepared, pos)
-    all_locations = get_prepared_data(loc_prepared, pos)
-    coordinates = get_prepared_data(coor_prepared, pos)
-    coordinates = [eval(x) for x in coordinates]
-
-    '''
-        ## Локации, где снимался фильм
-    '''
-    draw_locations(coordinates, all_locations)
-
-    '''
-        ## Интересно посмотреть, в каком количестве фильмов, которые были номинированы на Оскар, снялся этот актер
-    '''
-
-    picked_actor = st.selectbox("Выберете актера", actors_names)
-    cnt_nominations = 0
-    cnt_wins = 0
-    for ind, movie in best_picture_data.dropna().iterrows():
-        actors = [x.strip() for x in movie["Actors"].split(",")]
-        if(picked_actor.strip() in actors):
-            if(movie["Award"] == "Nominee"):
-                cnt_nominations += 1
-            else:
-                cnt_wins += 1
-
-    st.write("Номинированные фильмы: ", cnt_nominations)
-    st.write("Фильмы с оскаром: ", cnt_wins)
-
-    '''
-        ## С кем этот актер снимался за свою актеру?
-    '''
-
-    actor_links = pd.DataFrame(columns=["from", "to"])
-
-    for ind, movie in best_picture_data.dropna().iterrows():
-        actors = [x.strip() for x in movie["Actors"].split(",")]
-        if(picked_actor.strip() in actors):
-            for other_actor in actors:
-                if(picked_actor.strip()!=other_actor):
-                    actor_links = pd.concat([actor_links, pd.DataFrame({"from": [picked_actor.strip()], "to": [other_actor]})])
-
-    graph = nx.DiGraph([(frm, to) for (frm, to) in actor_links.values])
-    subgraph = graph.subgraph([picked_actor.strip()] + list(graph.neighbors(picked_actor.strip())))
-
-    g = net.Network(height=500, width=500)
-    g.from_nx(subgraph)
-    g.show("vis.html")
-    HtmlFile = open("vis.html", 'r', encoding='utf-8')
-    source_code = HtmlFile.read()
-    components.html(source_code, height=1500, width=800)
+    """
+        ## Для начала возьмем популярные фильмы и сериалы сейчас(с помощью нужного API запроса) и посмотрим, какие жанры там встречаются 
+    """
 
     # the following python code was collected from https://curlconverter.com/ using cURL link derived from IMDB
     # START FROM https://curlconverter.com/
@@ -243,15 +209,155 @@ with st.echo(code_location='below'):
     }
 
     response = requests.get('https://api.graphql.imdb.com/', params=params, cookies=cookies, headers=headers)
-    #END FROM
+    # END FROM
 
     found = response.json()
     fan_list = found["data"]["fanPicksTitles"]["edges"]
     movie_list = []
+    movie_names = []
     for el in fan_list:
-        movie_list.append(el["node"]["originalTitleText"]["text"])
-    st.write(movie_list)
+        genres = []
+        for el1 in el["node"]["titleCardGenres"]["genres"]:
+            genres.append(el1["text"])
 
+        movie_list.append([el["node"]["originalTitleText"]["text"], genres])
+
+    fan_fav = pd.DataFrame(movie_list, columns=["movie", "genres"])
+    dct_count = {}
+    for ind, row in fan_fav.iterrows():
+        for el in row["genres"]:
+            if (el in dct_count):
+                dct_count[el] += 1
+            else:
+                dct_count[el] = 1
+
+    res = pd.DataFrame(list(dct_count.items()), columns=["genre", "num"])
+    fig = px.histogram(res, x="genre", y="num",
+                       labels={"genre": "Жанр"})
+    st.write(fan_fav)
+    st.plotly_chart(fig)
+
+    """
+        ## Далее с помощью веб-скреппинга получим информацию по конкрентному фильму - список актеров и локации, где фильм был снят. 
+        ## Код для обработки прописан в функциях выше, а также в отдельном файле .ipynb на гитхабе, где можно ввести любой фильм самому и получить те же данные.
+    """
+
+    '''
+        ## Можно выбрать обработанные фильмы из предложенного списка
+    '''
+
+    movies_prepared = ["The ShawShank Redemption", "The Godfather", "The Dark Knight"]
+    actors_prepared = ["TheShawShankRedemptionActors.txt","TheGodfatherActors.txt","TheDarkKnightActors.txt"]
+    loc_prepared = ["TheShawShankRedemptionLoc.txt", "TheGodfatherLoc.txt", "TheDarkKnightLoc.txt"]
+    coor_prepared = ["TheShawShankRedemptionCoor.txt","TheGodfatherCoor.txt", "TheDarkKnightCoor.txt"]
+
+    picked_movie = st.selectbox("Выбрать фильм из списка для демонстрации", movies_prepared)
+    pos = movies_prepared.index(picked_movie)
+    actors_names = get_prepared_data(actors_prepared, pos)
+    all_locations = get_prepared_data(loc_prepared, pos)
+    coordinates = get_prepared_data(coor_prepared, pos)
+    coordinates = [eval(x) for x in coordinates]
+
+    '''
+        ## Локации, где снимался фильм
+    '''
+    draw_locations(coordinates, all_locations)
+
+    '''
+        ## Интересно посмотреть, в каком количестве фильмов, которые были номинированы на Оскар, снялся любой актер
+    '''
+
+    picked_actor = st.selectbox("Выберете актера", actors_names)
+    cnt_nominations = 0
+    cnt_wins = 0
+    for ind, movie in best_picture_data.dropna().iterrows():
+        actors = [x.strip() for x in movie["Actors"].split(",")]
+        if(picked_actor.strip() in actors):
+            if(movie["Award"] == "Nominee"):
+                cnt_nominations += 1
+            else:
+                cnt_wins += 1
+
+    st.write("Номинированные фильмы: ", cnt_nominations)
+    st.write("Фильмы с оскаром: ", cnt_wins)
+
+    '''
+        ## С кем этот актер снимался за свою актеру?
+    '''
+
+    try:
+        actor_links = pd.DataFrame(columns=["from", "to"])
+
+        for ind, movie in best_picture_data.dropna().iterrows():
+            actors = [x.strip() for x in movie["Actors"].split(",")]
+            if(picked_actor.strip() in actors):
+                for other_actor in actors:
+                    if(picked_actor.strip()!=other_actor):
+                        actor_links = pd.concat([actor_links, pd.DataFrame({"from": [picked_actor.strip()], "to": [other_actor]})])
+
+        graph = nx.DiGraph([(frm, to) for (frm, to) in actor_links.values])
+        subgraph = graph.subgraph([picked_actor.strip()] + list(graph.neighbors(picked_actor.strip())))
+
+        g = net.Network(height=500, width=500)
+        g.from_nx(subgraph)
+        g.show("vis.html")
+        HtmlFile = open("vis.html", 'r', encoding='utf-8')
+        source_code = HtmlFile.read()
+        components.html(source_code, height=500, width=800)
+    except nx.exception.NetworkXError:
+        st.write("Этого актера нет в данных")
+
+    '''
+        ## Попробуем предсказать, соберет ли фильм 100 миллионов в прокате, используя наши данные
+    '''
+
+    st.write("Кодируем единицой те фильмы, которым удалось собрать 100 миллионов в прокате")
+
+    df_copy = movie_metadata.copy().dropna()
+
+    target = np.where(df_copy["gross"] <= 100000000, 0, 1)
+
+    df = df_copy.loc[:,["duration", "budget","imdb_score"]]
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write(df.head(10))
+
+    with col2:
+        st.write(pd.DataFrame(target, columns = ["1 - собрал, 0 - нет"]).head(10))
+
+    df = (df - df.mean())/df.std()
+
+    X_train, X_test, y_train, y_test = train_test_split(df, target)
+
+    knn = KNeighborsClassifier()
+    knn.fit(X_train, y_train)
+    y_pred = knn.predict(X_test)
+
+    st.write("Модель готова")
+    st.write("AUC SCORE: ", roc_auc_score(y_test, y_pred))
+
+    st.write("Теперь эту простую модель можно попробовать использовать для фильмов, которые только вышли в прокат, и попытаться предсказать их сборы")
+
+    '''
+        ## И последнее, давайте вернемся к одному из трех наших фильмов, а именно фильму Темный Рыцарь(The Dark Knight) и посмотрим на все диалоги в этом фильме
+    '''
+
+    dialogues = pd.read_csv("joker.csv")
+    s = ""
+    for ind, row in dialogues.iterrows():
+        s = s + row["line"]
+
+    word = st.text_input("Введите слово: ")
+    cnt = len(re.findall(word, s))
+    st.write("Сколько раз слово встречается в фильме: ", cnt)
+
+    st.write("Например, имя главного героя вообще не называется в фильме, слово джокер произносится только 4 раза")
+
+    """
+        # Спасибо за внимание
+    """
 
 
 
