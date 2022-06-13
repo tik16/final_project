@@ -128,59 +128,44 @@ with st.echo(code_location='below'):
         draw_locations(coordinates, all_locations)
 
 
-
-
-    '''
-        # Анализ различных данных про фильмы 
-    '''
-
-    st.write("Для начала посмотрим на данные по кинопремии Оскар. Используем два датасета - "
-             "информация про все номинации в каждый год, а также расширенную информацию по номинации \"Лучший фильм\"")
-
     oscar_data, best_picture_data, movie_metadata = get_data()
 
     show_data = st.expander("Посмотреть данные")
 
     with show_data:
-        st.write(oscar_data.tail(20))
+        st.write(oscar_data.head(20))
         st.write(best_picture_data.head(20))
+        st.write(movie_metadata.head(20))
 
     """
         # Работа с сайтом IMDB
     """
 
-    st.write("Для демонстрации можно взять уже обработанные фильмы из предложенного списка")
-    st.write("Также можно самому ввести название любого фильма, немного подождать и также получить результаты")
+    '''
+        ## Можно выбрать обработанные фильмы из предложенного списка
+    '''
 
     movies_prepared = ["The ShawShank Redemption", "The Godfather", "The Dark Knight"]
     actors_prepared = ["TheShawShankRedemptionActors.txt","TheGodfatherActors.txt","TheDarkKnightActors.txt"]
     loc_prepared = ["TheShawShankRedemptionLoc.txt", "TheGodfatherLoc.txt", "TheDarkKnightLoc.txt"]
     coor_prepared = ["TheShawShankRedemptionCoor.txt","TheGodfatherCoor.txt", "TheDarkKnightCoor.txt"]
 
-    col1, col2 = st.columns(2)
-    with col1:
-        picked_movie = st.selectbox("Выбрать фильм из списка для демонстрации", movies_prepared)
-        pos = movies_prepared.index(picked_movie)
-        actors_names = get_prepared_data(actors_prepared, pos)
-        all_locations = get_prepared_data(loc_prepared, pos)
-        coordinates = get_prepared_data(coor_prepared, pos)
-        coordinates = [eval(x) for x in coordinates]
+    picked_movie = st.selectbox("Выбрать фильм из списка для демонстрации", movies_prepared)
+    pos = movies_prepared.index(picked_movie)
+    actors_names = get_prepared_data(actors_prepared, pos)
+    all_locations = get_prepared_data(loc_prepared, pos)
+    coordinates = get_prepared_data(coor_prepared, pos)
+    coordinates = [eval(x) for x in coordinates]
 
-    with col2:
-        title = st.text_input('Movie title')
-        if(title):
-            res = get_film_data(title)
-            actors_names = res[0]
-            film_url = res[1]
-            loc_info = get_locations(film_url)
-            all_locations = loc_info[0]
-            coordinates = loc_info[1]
-
-
-    st.write("Локации, где снимался фильм")
+    '''
+        ## Локации, где снимался фильм
+    '''
     draw_locations(coordinates, all_locations)
 
-    st.write("Интересно посмотреть, в каком количестве фильмов, которые были номинированы на Оскар, снялся этот актер")
+    '''
+        ## Интересно посмотреть, в каком количестве фильмов, которые были номинированы на Оскар, снялся этот актер
+    '''
+
     picked_actor = st.selectbox("Выберете актера", actors_names)
     cnt_nominations = 0
     cnt_wins = 0
@@ -195,7 +180,9 @@ with st.echo(code_location='below'):
     st.write("Номинированные фильмы: ", cnt_nominations)
     st.write("Фильмы с оскаром: ", cnt_wins)
 
-    st.write("С кем этот актер снимался за свою актеру?")
+    '''
+        ## С кем этот актер снимался за свою актеру?
+    '''
 
     actor_links = pd.DataFrame(columns=["from", "to"])
 
@@ -206,17 +193,14 @@ with st.echo(code_location='below'):
                 if(picked_actor.strip()!=other_actor):
                     actor_links = pd.concat([actor_links, pd.DataFrame({"from": [picked_actor.strip()], "to": [other_actor]})])
 
-    wikigraph = nx.DiGraph([(frm, to) for (frm, to) in actor_links.values])
-    subgraph = wikigraph.subgraph(
-        [picked_actor.strip()] + list(wikigraph.neighbors(picked_actor.strip())))
+    graph = nx.DiGraph([(frm, to) for (frm, to) in actor_links.values])
+    subgraph = graph.subgraph([picked_actor.strip()] + list(graph.neighbors(picked_actor.strip())))
 
-    fig, ax = plt.subplots()
     g = net.Network(height=500, width=500)
     g.from_nx(subgraph)
     g.show("vis.html")
     HtmlFile = open("vis.html", 'r', encoding='utf-8')
     source_code = HtmlFile.read()
-
     components.html(source_code, height=1500, width=800)
 
     # the following python code was collected from https://curlconverter.com/ using cURL link derived from IMDB
@@ -266,7 +250,7 @@ with st.echo(code_location='below'):
     movie_list = []
     for el in fan_list:
         movie_list.append(el["node"]["originalTitleText"]["text"])
-    #st.write(movie_list)
+    st.write(movie_list)
 
 
 
