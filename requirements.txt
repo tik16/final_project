@@ -10,3 +10,4 @@ selenium
 networkx
 pyvis
 webdriver_manager
+scikit-learn
